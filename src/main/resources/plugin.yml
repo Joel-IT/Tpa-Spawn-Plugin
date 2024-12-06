@@ -1,0 +1,14 @@
+name: Tpa
+version: '1.0-SNAPSHOT'
+main: ch.plugin.tpa.Tpa
+api-version: '1.21'
+commands:
+  tpa:
+    description: "Send a teleport request to another player."
+    usage: "/tpa <player>"
+  tpaccept:
+    description: "Accept a teleport request."
+    usage: "/tpaccept"
+  tpdeny:
+    description: "Deny a teleport request."
+    usage: "/tpdeny"
