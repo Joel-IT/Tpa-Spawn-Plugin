@@ -3,6 +3,7 @@ package ch.plugin.tpa;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -17,21 +18,40 @@ public class Tpa extends JavaPlugin {
 
     private final HashMap<UUID, UUID> tpaRequests = new HashMap<>();
     private Location spawnLocation;
+    private int teleportCountdown; // Anzahl der Sekunden für den Countdown
 
     @Override
     public void onEnable() {
+        // Konfigurationsdatei laden
+        saveDefaultConfig();
+        loadConfig();
+
         // Registrierung der Kommandos
         getCommand("tpa").setExecutor(new CommandHandler());
         getCommand("tpaccept").setExecutor(new CommandHandler());
         getCommand("tpdeny").setExecutor(new CommandHandler());
         getCommand("spawn").setExecutor(new CommandHandler());
-        getCommand("setspawn").setExecutor(new CommandHandler()); // Registrierung des setspawn-Befehls
+        getCommand("setspawn").setExecutor(new CommandHandler());
         getLogger().info("TPA Plugin wurde aktiviert!");
     }
 
     @Override
     public void onDisable() {
+        saveConfig(); // Speichert die Konfiguration beim Deaktivieren
         getLogger().info("TPA Plugin wurde deaktiviert!");
+    }
+
+    private void loadConfig() {
+        // Lade den Spawnpunkt und den Countdown von der Konfigurationsdatei
+        teleportCountdown = getConfig().getInt("teleport-countdown", 3);
+        if (getConfig().contains("spawn")) {
+            double x = getConfig().getDouble("spawn.x");
+            double y = getConfig().getDouble("spawn.y");
+            double z = getConfig().getDouble("spawn.z");
+            String worldName = getConfig().getString("spawn.world");
+
+            spawnLocation = new Location(Bukkit.getWorld(worldName), x, y, z);
+        }
     }
 
     private class CommandHandler implements CommandExecutor {
@@ -55,7 +75,7 @@ public class Tpa extends JavaPlugin {
                 case "spawn":
                     return handleSpawnCommand(player);
                 case "setspawn":
-                    return handleSetSpawnCommand(player); // Neuer Befehl um den Spawn zu setzen
+                    return handleSetSpawnCommand(player);
             }
             return true;
         }
@@ -119,13 +139,47 @@ public class Tpa extends JavaPlugin {
                 player.sendMessage(ChatColor.RED + "Der Spawnpunkt wurde noch nicht gesetzt.");
                 return true;
             }
-            player.teleport(spawnLocation);
-            player.sendMessage(ChatColor.GREEN + "Du wurdest zum Spawn teleportiert!");
+
+            player.sendMessage(ChatColor.GREEN + "Teleportiere dich zum Spawn in " + teleportCountdown + " Sekunden...");
+            new BukkitRunnable() {
+                private int countdown = teleportCountdown;
+                private final Location initialLocation = player.getLocation(); // Speichere die Anfangsposition
+
+                @Override
+                public void run() {
+                    // Überprüfen, ob sich der Spieler bewegt hat
+                    if (!player.getLocation().equals(initialLocation)) {
+                        player.sendMessage(ChatColor.RED + "Teleport abgebrochen, da du dich bewegt hast.");
+                        this.cancel();
+                        return;
+                    }
+
+                    if (countdown > 0) {
+                        player.sendTitle("", ChatColor.AQUA + "Teleportiere in " + countdown + "...", 0, 20, 0);
+                        countdown--;
+                    } else {
+                        player.teleport(spawnLocation);
+                        player.sendMessage(ChatColor.GREEN + "Du wurdest zum Spawn teleportiert.");
+                        this.cancel();
+                    }
+                }
+            }.runTaskTimer(Tpa.this, 0L, 20L); // 20 ticks = 1 Sekunde
             return true;
         }
 
         private boolean handleSetSpawnCommand(Player player) {
+            if (!player.hasPermission("tpa.setspawn")) {
+                player.sendMessage(ChatColor.RED + "Du hast keine Berechtigung, um den Spawnpunkt zu setzen.");
+                return true;
+            }
+
             spawnLocation = player.getLocation(); // Setzt den aktuellen Standort des Spielers als Spawnpunkt
+            getConfig().set("spawn.x", spawnLocation.getX());
+            getConfig().set("spawn.y", spawnLocation.getY());
+            getConfig().set("spawn.z", spawnLocation.getZ());
+            getConfig().set("spawn.world", spawnLocation.getWorld().getName());
+            saveConfig(); // Speichern der Änderungen in der Konfigurationsdatei
+
             player.sendMessage(ChatColor.GREEN + "Spawnpunkt gesetzt auf: " +
                                "X: " + spawnLocation.getBlockX() +
                                ", Y: " + spawnLocation.getBlockY() +
@@ -134,14 +188,22 @@ public class Tpa extends JavaPlugin {
         }
 
         private void initiateTeleport(Player requester, Player target) {
-            requester.sendMessage(ChatColor.GREEN + "Teleport-Anfrage akzeptiert. Teleportiere in 3 Sekunden...");
-            target.sendMessage(ChatColor.GREEN + "Du hast die Teleport-Anfrage akzeptiert. Teleportiere " + requester.getName() + " in 3 Sekunden...");
+            requester.sendMessage(ChatColor.GREEN + "Teleport-Anfrage akzeptiert. Teleportiere in " + teleportCountdown + " Sekunden...");
+            target.sendMessage(ChatColor.GREEN + "Du hast die Teleport-Anfrage akzeptiert. Teleportiere " + requester.getName() + " in " + teleportCountdown + " Sekunden...");
 
             new BukkitRunnable() {
-                private int countdown = 3;
+                private int countdown = teleportCountdown;
+                private final Location initialLocation = requester.getLocation(); // Speichere die Anfangsposition
 
                 @Override
                 public void run() {
+                    // Überprüfen, ob sich der Spieler bewegt hat
+                    if (!requester.getLocation().equals(initialLocation)) {
+                        requester.sendMessage(ChatColor.RED + "Teleport abgebrochen, da du dich bewegt hast.");
+                        this.cancel();
+                        return;
+                    }
+
                     if (countdown > 0) {
                         requester.sendTitle("", ChatColor.AQUA + "Teleportiere in " + countdown + "...", 0, 20, 0);
                         countdown--;

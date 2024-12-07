@@ -1,0 +1,7 @@
+# TPA Plugin-Konfiguration
+teleport-countdown: 3
+spawn:
+  x: 0
+  y: 0
+  z: 0
+  world: "world" # Name der Welt, in der der Spawnpunkt standardmäßig gespeichert ist
