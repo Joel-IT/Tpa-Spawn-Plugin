@@ -12,3 +12,13 @@ commands:
   tpdeny:
     description: "Deny a teleport request."
     usage: "/tpdeny"
+  spawn:
+    description: "Teleport to the set spawn."
+    usage: "/spawn"
+  setspawn:
+    description: "Set the current location as the spawn point."
+    usage: "/setspawn"
+permissions:
+  tpa.setspawn:
+    description: "Erlaubt es dem Spieler, den Spawnpunkt zu setzen."
+    default: op
